@@ -242,4 +242,3 @@ proc ::quote::Comment {ch} {
 ## Ready
 
 package provide quote 1
-
