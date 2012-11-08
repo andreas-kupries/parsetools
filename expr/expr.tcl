@@ -1,5 +1,5 @@
 # -*- tcl -*-
-# Copyright (c) 2009 Andreas Kupries <andreas_kupries@sourceforge.net>
+# Copyright (c) 2009-2012 Andreas Kupries <andreas_kupries@sourceforge.net>
 
 # Verification of serialized parsing expressions, conversion
 # between such and other data structures, and their construction.
@@ -8,7 +8,7 @@
 ## Requirements
 
 package require Tcl 8.5              ; # Required runtime.
-package require char                 ; # Character quoting utilities.
+package require quote                ; # Character quoting utilities.
 
 # # ## ### ##### ######## ############# #####################
 ##
@@ -30,7 +30,7 @@ namespace eval ::pt::pe {
 # # ## ### ##### ######## #############
 ## Public API
 
-# Check that the proposed serialization of a keyword index is
+# Check that the proposed serialization of an expression is
 # indeed such.
 
 proc ::pt::pe::verify {serial {canonvar {}}} {
