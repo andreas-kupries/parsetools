@@ -27,7 +27,7 @@ namespace eval ::pt {
 # # ## ### ##### ######## #############
 ## Public API - Operator database
 
-proc ::pt::operator::def {name arguments args} {
+proc ::pt::operator::define {name arguments args} {
     variable op
 
     if {[dict exists $op $name]} {
@@ -62,7 +62,7 @@ proc ::pt::operator::def {name arguments args} {
     set spec  {}
     set cargs op
     foreach s $arguments {
-	if {[string match {[*]*} $s]} {
+	if {[string match {*[*]} $s]} {
 	    lappend spec *
 	    lappend cargs [string range $s 1 end]
 	} else {
@@ -77,7 +77,7 @@ proc ::pt::operator::def {name arguments args} {
     # Default implementations for the various function vectors
     dict set op $name canonical [lambda $cargs { return 1   }] ; # unconditionally canonical
     dict set op $name print     [lambda $cargs { list <$op> }] ; # operator display.
-    dict set op $name makecanon [lambda $cargs { lrange [info level 0] 1 end }
+    dict set op $name makecanon [lambda $cargs { lrange [info level 0] 1 end }]
 
     # Override the defaults with the user-specified scripts.
     dict for {f script} $args {
@@ -147,7 +147,7 @@ proc ::pt::operator::valid {term msgvar} {
 
     set n [llength $arguments]
 
-    dict with $op $operator {} ; # => min, max, spec, canonical
+    dict with op $operator {} ; # => min, max, spec, canonical
 
     if {($n < $min) || ($max < $n)} {
 	upvar 1 $msgvar msg
@@ -172,7 +172,7 @@ proc ::pt::operator::canonical {term msgvar} {
 	return no
     }
 
-    dict with $op $operator {} ; # => min, max, spec, canonical
+    dict with op $operator {} ; # => min, max, spec, canonical
 
     if {![{*}$canonical $operator {*}$arguments]} {
 	upvar 1 $msgvar msg
@@ -197,7 +197,7 @@ proc ::pt::operator::print {term} {
 	    "Invalid operator \"$operator\""
     }
 
-    dict with $op $operator {} ; # => print
+    dict with op $operator {} ; # => print
     return [{*}$print $operator {*}$arguments]
 }
 
@@ -209,7 +209,7 @@ proc ::pt::operator::makecanon {term} {
 	    "Invalid operator \"$operator\""
     }
 
-    dict with $op $operator {} ; # => makecanon
+    dict with op $operator {} ; # => makecanon
     return [{*}$makecanon $operator {*}$arguments]
 }
 
@@ -317,5 +317,5 @@ pt operator define ochoice {e* ...} canonical {
 # # ## ### ##### ######## ############# #####################
 ## Ready
 
-package provide pt::pe 1
+package provide pt::operator 1
 return
