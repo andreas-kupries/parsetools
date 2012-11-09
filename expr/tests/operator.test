@@ -1,0 +1,106 @@
+# -*- tcl -*- tcl.tk//DSL tcltest//EN//2.0
+# # ## ### ##### ######## ############# #####################
+## operator.test:  tests for package 'pt::operator'.
+#
+# Copyright (c) 2009-2012 Andreas Kupries <andreas_kupries@users.sourceforge.net>
+# All rights reserved.
+
+kt check Tcl     8.5
+kt check tcltest 2
+
+kt local support quote
+kt local support lambda
+kt local testing pt::operator
+
+# # ## ### ##### ######## ############# #####################
+
+#kt system support fileutil
+#source [localPath tests/common]
+#set mytestdir     tests/data
+
+# # ## ### ##### ######## ############# #####################
+## Commands under test
+
+# pt operator define
+# pt operator definition
+# pt operator exists
+# pt operator leaf
+# pt operator valid
+# pt operator canonical
+# pt operator print
+# pt operator makecanon
+
+## Per operator O (see the standard operators below).
+
+# pt operator O leaf
+# pt operator O print
+
+##
+# # ## ### ##### ######## ############# #####################
+
+
+
+
+
+
+
+# # ## ### ##### ######## ############# #####################
+## Standard operators - Definitions
+
+foreach {n op def} {
+    - ---------- ----------------------------------
+    1  epsilon   {leaf 1 min 0 max 0   spec {}}
+    2  any       {leaf 1 min 0 max 0   spec {}}
+    3  token     {leaf 1 min 1 max 1   spec {-}}
+    4  range     {leaf 1 min 2 max 2   spec {- -}}
+    - ---------- ----------------------------------
+    5  alpha     {leaf 1 min 0 max 0   spec {}}
+    6  alnum     {leaf 1 min 0 max 0   spec {}}
+    7  ascii     {leaf 1 min 0 max 0   spec {}}
+    8  digit     {leaf 1 min 0 max 0   spec {}}
+    9  graph     {leaf 1 min 0 max 0   spec {}}
+    10 lower     {leaf 1 min 0 max 0   spec {}}
+    11 print     {leaf 1 min 0 max 0   spec {}}
+    12 punct     {leaf 1 min 0 max 0   spec {}}
+    13 space     {leaf 1 min 0 max 0   spec {}}
+    14 upper     {leaf 1 min 0 max 0   spec {}}
+    15 wordchar  {leaf 1 min 0 max 0   spec {}}
+    16 xdigit    {leaf 1 min 0 max 0   spec {}}
+    17 ddigit    {leaf 1 min 0 max 0   spec {}}
+    - ---------- ----------------------------------
+    18 symbol    {leaf 1 min 1 max 1   spec {-}}
+    - ---------- ----------------------------------
+    19 sequence  {leaf 0 min 1 max Inf spec {*}}
+    20 uchoice   {leaf 0 min 1 max Inf spec {*}}
+    - ---------- ----------------------------------
+    21 repeat0   {leaf 0 min 1 max 1   spec {*}}
+    22 repeat1   {leaf 0 min 1 max 1   spec {*}}
+    23 optional  {leaf 0 min 1 max 1   spec {*}}
+    - ---------- ----------------------------------
+    24 lookahead {leaf 0 min 1 max 1   spec {*}}
+    25 notahead  {leaf 0 min 1 max 1   spec {*}}
+    26 ochoice   {leaf 0 min 1 max Inf spec {*}}
+    - ---------- ----------------------------------
+} {
+    if {$n eq "-"} continue
+
+    test pt-operator-X.$n "pt operator $op, arg-spec" -body {
+	dict get [pt operator definition $op] spec
+    } -result [dict get $def spec]
+
+    test pt-operator-X.$n "pt operator $op, min-arity" -body {
+	dict get [pt operator definition $op] min
+    } -result [dict get $def min]
+
+    test pt-operator-Y.$n "pt operator $op, max-arity" -body {
+	dict get [pt operator definition $op] max
+    } -result [dict get $def max]
+
+    test pt-operator-Z.$n "pt operator $op, leaf-ness" -body {
+	pt operator leaf $op
+    } -result [dict get $def leaf]
+}
+
+# # ## ### ##### ######## ############# #####################
+#unset mytestdir
+cleanupTests
