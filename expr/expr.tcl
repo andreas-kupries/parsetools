@@ -1,112 +1,222 @@
 # -*- tcl -*-
 # Copyright (c) 2009-2012 Andreas Kupries <andreas_kupries@sourceforge.net>
 
-# Verification of serialized parsing expressions, conversion
-# between such and other data structures, and their construction.
+# Grammar expression handling.
+# - (De)serialize expressions, various formats
+# - Validate expressions.
+# - Walk (visit) expressions.
 
 # # ## ### ##### ######## ############# #####################
 ## Requirements
 
 package require Tcl 8.5              ; # Required runtime.
 package require quote                ; # Character quoting utilities.
+package require lambda               ; # Readable apply.
+package require try                  ; # try/finally for 8.5
+package require pt::operator         ; # Operators in expressions.
 
 # # ## ### ##### ######## ############# #####################
-##
+## API visibility
 
-namespace eval ::pt::pe {
-    namespace export \
-	verify verify-as-canonical canonicalize \
-	bottomup topdown print equal \
-	\
-	epsilon dot alnum alpha ascii digit graph lower printable \
-	punct space upper wordchar xdigit ddigit \
-	nonterminal optional repeat0 repeat1 ahead notahead \
-	choice sequence \
-	terminal range
+namespace eval ::pt::expr {
+    namespace export {[a-z]*}
+    namespace ensemble create
 
+    namespace import ::pt::operator
+}
+
+namespace eval ::pt {
+    namespace export expr
     namespace ensemble create
 }
 
-# # ## ### ##### ######## #############
-## Public API
+# # ## ### ##### ######## ############# #####################
+## Public API I - Visit expressions.
+##
+## - Bottom up.             Generation of synthetic attributes.
+## - Top-down (left-right). Management of an inherited context.
+## - Down/up. Combination managing an inherit context and synthetic attributes.
 
-# Check that the proposed serialization of an expression is
-# indeed such.
-
-proc ::pt::pe::verify {serial {canonvar {}}} {
-    variable ourprefix
-    variable ourempty
-    #puts "V <$serial> /[llength [info level 0]] / [info level 0]"
-
-    if {[llength $serial] == 0} {
-	return -code error $ourprefix$ourempty
-    }
-
-    if {$canonvar ne {}} {
-	upvar 1 $canonvar iscanonical
-	set iscanonical [string equal $serial [list {*}$serial]]
-    }
-
-    topdown [list [namespace current]::Verify] $serial
-    return
+namespace eval ::pt::expr::walk {
+    namespace export up down
+    namespace ensemble create
 }
 
-proc ::pt::pe::verify-as-canonical {serial} {
-    verify $serial iscanonical
-    if {!$iscanonical} {
-	variable ourprefix
-	variable ourimpure
-	return -code error $ourprefix$ourimpure
-    }
-    return
-}
-
-proc ::pt::pe::Verify {pe op arguments} {
-    variable ourprefix
-    variable ourbadop
-    variable ourarity
-    variable ourwrongargs
-    variable ourempty
-
-    #puts "VE <$pe /$op /$arguments>"
-    if {[llength $pe] == 0} {
-	return -code error $ourprefix$ourempty
+proc ::pt::expr::walk::up {cmdprefix expression} {
+    if {![operator valid $expression msg]} {
+	return -code error -errorcode {PT EXPR INVALID} $msg
     }
 
-    if {![info exists ourarity($op)]} {
-	return -code error $ourprefix[format $ourbadop $op]
-    }
+    set arguments [lassign $expression operator]
 
-    lassign $ourarity($op) min max
+    set spec [dict get [operator definition $operator] spec]
 
+    # Extend spec to match the arguments. This can only happen for
+    # max-arity == +Inf, any other mismatch is rejected by the
+    # validation above.
+    set k [llength $spec]
     set n [llength $arguments]
-    if {($n < $min) || (($max >= 0) && ($n > $max))} {
-	return -code error $ourprefix[format $ourwrongargs $op]
+    if {$k < $n} {
+	lappend spec {*}[lrepeat [- $n $k] [lindex $spec end]]
     }
 
-    upvar 1 iscanonical iscanonical
-    if {
-	[info exists iscanonical] &&
-	(($pe ne [list {*}$pe]) ||
-	 ($op eq "..") && ([lindex $arguments 0] eq [lindex $arguments 1]))
-    } {
-	# Reject coding with superfluous whitespace, and the use of
-	# {.. x x} as coding for {t x} as non-canonical.
+    # Process the arguments first (bottom-up!)
+    foreach s $spec a $arguments {
+	if {$s eq "-"} {
+	    lappend eargs $a
+	} else {
+	    # Recurse into expandable arguments.
+	    lappend eargs [up $cmdprefix $a]
+	}
+    }
 
-	set iscanonical 0
+    # Now process the current node, providing both original and
+    # processed arguments to the callback.
+
+    # Note: The operator name is used as sub-method in the call. The
+    # result of the call goes into the caller as part of the processed
+    # information.
+
+    return [{*}$cmdprefix $operator $arguments $eargs]
+}
+
+proc ::pt::expr::walk::down {contextvar cmdprefix expression} {
+    upvar 1 $contextvar context
+
+    if {![operator valid $expression msg]} {
+	return -code error -errorcode {PT EXPR INVALID} $msg
+    }
+
+    set arguments [lassign $expression operator]
+
+    # Process the current node first, providing context and original
+    # arguments to the callback. Note: The operator name is used as
+    # sub-method in the call. The result of the call is ignored.
+
+    {*}$cmdprefix $operator context $arguments
+
+    # The context however may have changed and is provided to the
+    # child nodes, whose processing is now done.
+
+    set spec [dict get [operator definition $operator] spec]
+
+    # Extend spec to match the arguments. This can only happen for
+    # max-arity == +Inf, any other mismatch is rejected by the
+    # validation above.
+    set k [llength $spec]
+    set n [llength $arguments]
+    if {$k < $n} {
+	lappend spec {*}[lrepeat [- $n $k] [lindex $spec end]]
+    }
+
+    # Process the arguments last
+    foreach s $spec a $arguments {
+	if {$s eq "*"} {
+	    # Recurse into expandable arguments.
+	    down context $cmdprefix $a
+	}
     }
     return
 }
 
+proc ::pt::expr::walk::downup {contextvar cmdprefix expression} {
+    upvar 1 $contextvar context
+
+    if {![operator valid $expression msg]} {
+	return -code error -errorcode {PT EXPR INVALID} $msg
+    }
+
+    set arguments [lassign $expression operator]
+
+    # Process the current node first, providing context and original
+    # arguments to the callback. Note: The operator name is used as
+    # sub-method in the call. The result of the call is ignored.
+
+    {*}$cmdprefix $operator down context $arguments
+
+    # The context however may have changed and is provided to the
+    # child nodes, whose processing is now done.
+
+    set spec [dict get [operator definition $operator] spec]
+
+    # Extend spec to match the arguments. This can only happen for
+    # max-arity == +Inf, any other mismatch is rejected by the
+    # validation above.
+    set k [llength $spec]
+    set n [llength $arguments]
+    if {$k < $n} {
+	lappend spec {*}[lrepeat [- $n $k] [lindex $spec end]]
+    }
+
+    # Process the arguments...
+    foreach s $spec a $arguments {
+	if {$s eq "-"} {
+	    lappend eargs $a
+	} else {
+	    # Recurse into expandable arguments.
+	    lappend eargs [downup context $cmdprefix $a]
+	}
+    }
+
+    # And process the current node a second time as we come back from
+    # the children.
+
+    return [{*}$cmdprefix $operator up context $arguments $eargs]
+}
+
+# # ## ### ##### ######## #############
+## Public API II - 
+
+proc ::pt::expr::valid {expression msgvar} {
+    # Validate the entire expression. The specified callback does
+    # nothing, because the checks are done by the walker itself.
+
+    try {
+	walk up [lambda {op oargs eargs} {}] $expression
+    } trap {PT EXPR INVALID} {e o} {
+	upvar 1 $msgvar msg
+	set msg $e
+	return no
+    }
+    return yes
+}
+
+proc ::pt::expr::canonical {expression msgvar} {
+    try {
+	walk up [lambda {op oargs eargs} {
+	    # TODO: Look for (range X X) terms.
+	    # Or, alternativively, define a 'canonical' method for
+	    # operators, and use it here, keeping things generic.
+
+	    # Check against irelevant whitespace, abort quickly.
+	    set canonical [string equal $expression [list {*}$expression]]
+	    if {!$canonical} {
+		return -code error \
+		    -errorcode {PT KETTLE INVALID} \
+		    "Irrelevant whitespace"
+	    }
+	    return
+	}]
+    } trap {PT EXPR INVALID} {e o} {
+	upvar 1 $msgvar msg
+	set msg $e
+	return no
+    }
+    return yes
+}
+
+
+return
+
 # # ## ### ##### ######## #############
 
-proc ::pt::pe::canonicalize {serial} {
+proc ::pt::expr::canonicalize {serial} {
     verify $serial iscanonical
     if {$iscanonical} { return $serial }
     return [bottomup [list [namespace current]::Canonicalize] $serial]
 }
 
-proc ::pt::pe::Canonicalize {pe op arguments} {
+proc ::pt::expr::Canonicalize {pe op arguments} {
     # The input is mostly already pulled apart into its elements. Now
     # we construct a pure list out of them, and if necessary, convert
     # a {.. x x} expression into the canonical {t x} representation.
@@ -124,11 +234,11 @@ proc ::pt::pe::Canonicalize {pe op arguments} {
 # string for test results. It assumes that the serialization is at
 # least structurally sound.
 
-proc ::pt::pe::print {serial} {
+proc ::pt::expr::print {serial} {
     return [join [bottomup [list [namespace current]::Print] $serial] \n]
 }
 
-proc ::pt::pe::Print {pe op arguments} {
+proc ::pt::expr::Print {pe op arguments} {
     switch -exact -- $op {
 	epsilon - alpha - alnum - ascii - digit - graph - lower - print - \
 	    punct - space - upper - wordchar - xdigit - ddigit - dot {
@@ -157,7 +267,7 @@ proc ::pt::pe::Print {pe op arguments} {
 
 # # ## ### ##### ######## #############
 
-proc ::pt::pe::equal {seriala serialb} {
+proc ::pt::expr::equal {seriala serialb} {
     return [string equal \
 		[canonicalize $seriala] \
 		[canonicalize $serialb]]
@@ -165,132 +275,18 @@ proc ::pt::pe::equal {seriala serialb} {
 
 # # ## ### ##### ######## #############
 
-proc ::pt::pe::bottomup {cmdprefix pe} {
-    Bottomup 2 $cmdprefix $pe
-}
-
-proc ::pt::pe::Bottomup {level cmdprefix pe} {
-    set op [lindex $pe 0]
-    set ar [lrange $pe 1 end]
-
-    switch -exact -- $op {
-	& - ! - * - + - ? - x - / {
-	    set clevel $level
-	    incr clevel
-	    set nar {}
-	    foreach a $ar {
-		lappend nar [Bottomup $clevel $cmdprefix $a]
-	    }
-	    set ar $nar
-	    set pe [list $op {*}$nar]
-	}
-	default {}
-    }
-
-    return [uplevel $level [list {*}$cmdprefix $pe $op $ar]]
-}
-
-proc ::pt::pe::topdown {cmdprefix pe} {
-    Topdown 2 $cmdprefix $pe
-    return
-}
-
-proc ::pt::pe::Topdown {level cmdprefix pe} {
-    set op [lindex $pe 0]
-    set ar [lrange $pe 1 end]
-
-    uplevel $level [list {*}$cmdprefix $pe $op $ar]
-
-    switch -exact -- $op {
-	& - ! - * - + - ? - x - / {
-	    incr level
-	    foreach a $ar {
-		Topdown $level $cmdprefix $a
-	    }
-	}
-	default {}
-    }
-    return
-}
-
 # # ## ### ##### ######## #############
 
-proc ::pt::pe::epsilon   {} { return epsilon  }
-proc ::pt::pe::dot       {} { return dot      }
-proc ::pt::pe::alnum     {} { return alnum    }
-proc ::pt::pe::alpha     {} { return alpha    }
-proc ::pt::pe::ascii     {} { return ascii    }
-proc ::pt::pe::digit     {} { return digit    }
-proc ::pt::pe::graph     {} { return graph    }
-proc ::pt::pe::lower     {} { return lower    }
-proc ::pt::pe::printable {} { return print    }
-proc ::pt::pe::punct     {} { return punct    }
-proc ::pt::pe::space     {} { return space    }
-proc ::pt::pe::upper     {} { return upper    }
-proc ::pt::pe::wordchar  {} { return wordchar }
-proc ::pt::pe::xdigit    {} { return xdigit   }
-proc ::pt::pe::ddigit    {} { return ddigit   }
-
-proc ::pt::pe::nonterminal {nt} { list n $nt }
-proc ::pt::pe::optional    {pe} { list ? $pe }
-proc ::pt::pe::repeat0     {pe} { list * $pe }
-proc ::pt::pe::repeat1     {pe} { list + $pe }
-proc ::pt::pe::ahead       {pe} { list & $pe }
-proc ::pt::pe::notahead    {pe} { list ! $pe }
-
-proc ::pt::pe::choice   {pe args} { linsert $args 0 / $pe }
-proc ::pt::pe::sequence {pe args} { linsert $args 0 x $pe }
-
-proc ::pt::pe::terminal {t}     { list t $t }
-proc ::pt::pe::range    {ta tb} {
-    if {$ta eq $tb} {
-	list t $ta
-    } else {
-	list .. $ta $tb
-    }
-}
-
-namespace eval ::pt::pe {
+namespace eval ::pt::expr {
     # # ## ### ##### ######## #############
     ## Strings for error messages.
 
     variable ourprefix    "error in serialization:"
     variable ourempty     " got empty string"
-    variable ourwrongargs " wrong#args for \"%s\""
-    variable ourbadop     " invalid operator \"%s\""
     variable ourimpure    " has irrelevant whitespace or (.. X X)"
 
     # # ## ### ##### ######## #############
     ## operator arities
-
-    variable  ourarity
-    array set ourarity {
-	epsilon  {0 0}
-	alpha    {0 0}
-	alnum    {0 0}
-	ascii    {0 0}
-	digit    {0 0}
-	graph    {0 0}
-	lower    {0 0}
-	print    {0 0}
-	punct    {0 0}
-	space    {0 0}
-	upper    {0 0}
-	wordchar {0 0}
-	xdigit   {0 0}
-	ddigit   {0 0}
-	dot      {0 0}
-	..       {2 2}
-	n        {1 1}
-	t        {1 1}
-	&        {1 1}
-	!        {1 1}
-	*        {1 1}
-	+        {1 1}
-	?        {1 1}
-	x        {1 -1}
-	/        {1 -1}
-    }
 
     ##
     # # ## ### ##### ######## #############
@@ -299,5 +295,5 @@ namespace eval ::pt::pe {
 # # ## ### ##### ######## ############# #####################
 ## Ready
 
-package provide pt::pe 1
+package provide pt::expr 1
 return

@@ -11,6 +11,7 @@ package require Tcl 8.5              ; # Required runtime.
 package require
 
 # # ## ### ##### ######## ############# #####################
+## API visibility
 
 namespace eval ::pt::operator {
     namespace export {[a-z]*}
