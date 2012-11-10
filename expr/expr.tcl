@@ -37,7 +37,7 @@ namespace eval ::pt {
 ## - Down/up. Combination managing an inherit context and synthetic attributes.
 
 namespace eval ::pt::expr::walk {
-    namespace export up down
+    namespace export up down downup
     namespace ensemble create
 }
 

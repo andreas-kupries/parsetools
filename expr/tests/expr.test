@@ -1,68 +1,92 @@
-# -*- tcl -*-
-# pe_structure.test:  tests for the pt::pe package.
+# -*- tcl -*- tcl.tk//DSL tcltest//EN//2.0
+# # ## ### ##### ######## ############# #####################
+## operator.test:  tests for package 'pt::operator'.
 #
-# Copyright (c) 2009 by Andreas Kupries <andreas_kupries@users.sourceforge.net>
+# Copyright (c) 2009-2012 Andreas Kupries <andreas_kupries@users.sourceforge.net>
 # All rights reserved.
-#
-# RCS: @(#) $Id: pt_pexpression.test,v 1.1 2010/03/26 05:07:24 andreas_kupries Exp $
 
-# -------------------------------------------------------------------------
+kt check Tcl     8.5
+kt check tcltest 2
 
-source [file join \
-	[file dirname [file dirname [file join [pwd] [info script]]]] \
-	devtools testutilities.tcl]
+kt local support quote
+kt local support lambda
+kt local support pt::operator
+kt local testing pt::expr
 
-testsNeedTcl     8.5
-testsNeedTcltest 2.0
+# # ## ### ##### ######## ############# #####################
+## Commands under test
 
-support {
-    use fileutil/fileutil.tcl  fileutil ; # For tests/common
-    use snit/snit.tcl          snit
+# pt expr walk up
+# pt expr walk down
+# pt expr walk downup
+# pt expr valid
+# pt expr canonical
+# pt expr print
+# pt expr makecanon
+# pt expr equal
 
-    source [localPath tests/common]
-}
-testing {
-    useLocal pt_pexpression.tcl pt::pe
-}
+##
+# # ## ### ##### ######## ############# #####################
 
-# -------------------------------------------------------------------------
+test pt-expr-1.0 "walk, wrong#args, not enough" -body {
+    pt expr walk
+} -returnCodes error -result {wrong # args: should be "pt expr walk subcommand ?argument ...?"}
 
-set mytestdir tests/data
+test pt-expr-1.1 "walk, bad method" -body {
+    pt expr walk bogus
+} -returnCodes error -result {unknown or ambiguous subcommand "bogus": must be down, downup, or up}
 
-# -------------------------------------------------------------------------
+# # ## ### ##### ######## ############# #####################
 
-source [localPath tests/pt_pexpression.tests]
+test pt-expr-2.0 "walk up, wrong#args, not enough" -body {
+    pt expr walk up
+} -returnCodes error -result {wrong # args: should be "pt expr walk up cmdprefix expression"}
+
+test pt-expr-2.1 "walk up, wrong#args, not enough" -body {
+    pt expr walk up C
+} -returnCodes error -result {wrong # args: should be "pt expr walk up cmdprefix expression"}
+
+test pt-expr-2.2 "walk up, wrong#args, too many" -body {
+    pt expr walk up C E X
+} -returnCodes error -result {wrong # args: should be "pt expr walk up cmdprefix expression"}
+
+# # ## ### ##### ######## ############# #####################
+
+# # ## ### ##### ######## ############# #####################
+return
+
+
 
 
 # -*- tcl -*-
 # Testsuite for pt::pe.
 # Called by the ../pe_structure.test driver file.
 
-test pt-pe-1.0 {verify, wrong#args} -body {
+test pt-expr-1.0 {verify, wrong#args} -body {
     pt::pe verify
 } -returnCodes error -result {wrong # args: should be "pt::pe verify serial ?canonvar?"}
 
-test pt-pe-1.1 {verify, wrong#args} -body {
+test pt-expr-1.1 {verify, wrong#args} -body {
     pt::pe verify PE PFX XXX
 } -returnCodes error -result {wrong # args: should be "pt::pe verify serial ?canonvar?"}
 
-test pt-pe-2.0 {print, wrong#args} -body {
+test pt-expr-2.0 {print, wrong#args} -body {
     pt::pe print
 } -returnCodes error -result {wrong # args: should be "pt::pe print serial"}
 
-test pt-pe-2.1 {print, wrong#args} -body {
+test pt-expr-2.1 {print, wrong#args} -body {
     pt::pe print PE XXX
 } -returnCodes error -result {wrong # args: should be "pt::pe print serial"}
 
-test pt-pe-5.1 {equal, wrong#args} -body {
+test pt-expr-5.1 {equal, wrong#args} -body {
     pt::pe equal
 } -returnCodes error -result {wrong # args: should be "pt::pe equal seriala serialb"}
 
-test pt-pe-5.2 {equal, wrong#args} -body {
+test pt-expr-5.2 {equal, wrong#args} -body {
     pt::pe equal PE
 } -returnCodes error -result {wrong # args: should be "pt::pe equal seriala serialb"}
 
-test pt-pe-5.3 {equal, wrong#args} -body {
+test pt-expr-5.3 {equal, wrong#args} -body {
     pt::pe equal PE PEB XXX
 } -returnCodes error -result {wrong # args: should be "pt::pe equal seriala serialb"}
 
@@ -76,7 +100,7 @@ foreach {badserial expected} {
     {x {t A} {}}	{got empty string}
     {foo}		{invalid operator "foo"}
 } {
-    test pt-pe-6.$n "pt::pe verify, error" -body {
+    test pt-expr-6.$n "pt::pe verify, error" -body {
 	pt::pe verify $badserial
     } -returnCodes error -result "error in serialization: $expected"
     incr n
@@ -100,7 +124,7 @@ foreach {op} {
     ddigit   
     dot      
 } {
-    test pt-pe-6.$n "pt::pe verify, arity 0/0 error, $op" -body {
+    test pt-expr-6.$n "pt::pe verify, arity 0/0 error, $op" -body {
 	pt::pe verify [list $op xxx]
     } -returnCodes error -result "error in serialization: wrong#args for \"$op\""
     incr n
@@ -116,11 +140,11 @@ foreach {op} {
     +
     ?
 } {
-    test pt-pe-6.$n "pt::pe verify, arity 1/1 error, $op" -body {
+    test pt-expr-6.$n "pt::pe verify, arity 1/1 error, $op" -body {
 	pt::pe verify [list $op]
     } -returnCodes error -result "error in serialization: wrong#args for \"$op\""
     incr n
-    test pt-pe-6.$n "pt::pe verify, arity 1/1 error, $op" -body {
+    test pt-expr-6.$n "pt::pe verify, arity 1/1 error, $op" -body {
 	pt::pe verify [list $op xxx yyy]
     } -returnCodes error -result "error in serialization: wrong#args for \"$op\""
     incr n
@@ -130,15 +154,15 @@ foreach {op} {
 foreach {op} {
     ..
 } {
-    test pt-pe-6.$n "pt::pe verify, arity 2/2 error, $op" -body {
+    test pt-expr-6.$n "pt::pe verify, arity 2/2 error, $op" -body {
 	pt::pe verify [list $op]
     } -returnCodes error -result "error in serialization: wrong#args for \"$op\""
     incr n
-    test pt-pe-6.$n "pt::pe verify, arity 2/2 error, $op" -body {
+    test pt-expr-6.$n "pt::pe verify, arity 2/2 error, $op" -body {
 	pt::pe verify [list $op xxx]
     } -returnCodes error -result "error in serialization: wrong#args for \"$op\""
     incr n
-    test pt-pe-6.$n "pt::pe verify, arity 2/2 error, $op" -body {
+    test pt-expr-6.$n "pt::pe verify, arity 2/2 error, $op" -body {
 	pt::pe verify [list $op xxx yyy zzz]
     } -returnCodes error -result "error in serialization: wrong#args for \"$op\""
     incr n
@@ -148,7 +172,7 @@ foreach {op} {
 foreach {op} {
     x /
 } {
-    test pt-pe-6.$n "pt::pe verify, arity 1/oo error, $op" -body {
+    test pt-expr-6.$n "pt::pe verify, arity 1/oo error, $op" -body {
 	pt::pe verify [list $op]
     } -returnCodes error -result "error in serialization: wrong#args for \"$op\""
     incr n
@@ -159,11 +183,11 @@ foreach {op} {
 TestFilesProcess $mytestdir ok pe_serial pe_serial-print -> n label input data expected {
     # The 'expected' data is irrelevant here, only used to satisfy
     # TestFilesProcess' syntax.
-    test pt-pe-7.$n "pt::pe verify, $label, ok" -body {
+    test pt-expr-7.$n "pt::pe verify, $label, ok" -body {
 	pt::pe verify $data
     } -result {}
 
-    test pt-pe-7.$n "pt::pe verify, $label, ok" -body {
+    test pt-expr-7.$n "pt::pe verify, $label, ok" -body {
 	pt::pe verify $data IGNORED
     } -result {}
 }
@@ -173,7 +197,7 @@ TestFilesProcess $mytestdir ok pe_serial pe_serial-print -> n label input data e
 TestFilesProcess $mytestdir ok pe_serial pe_serial-print -> n label input data expected {
     # The 'expected' data is irrelevant here, only used to satisfy
     # TestFilesProcess' syntax.
-    test pt-pe-8.$n "pt::pe print, $label" -body {
+    test pt-expr-8.$n "pt::pe print, $label" -body {
 	pt::pe print $data
     } -result $expected
 }
@@ -183,7 +207,7 @@ TestFilesProcess $mytestdir ok pe_serial pe_serial-print -> n label input data e
 TestFilesProcess $mytestdir ok pe_serial pe_serial-tddump -> n label input data expected {
     # The 'expected' data is irrelevant here, only used to satisfy
     # TestFilesProcess' syntax.
-    test pt-pe-11.$n "pt::pe topdown, $label" -setup {
+    test pt-expr-11.$n "pt::pe topdown, $label" -setup {
 	proc DUMP {pe args} { global res ; lappend res $pe }
 	set res {}
     } -body {
@@ -200,7 +224,7 @@ TestFilesProcess $mytestdir ok pe_serial pe_serial-tddump -> n label input data 
 TestFilesProcess $mytestdir ok pe_serial pe_serial-budump -> n label input data expected {
     # The 'expected' data is irrelevant here, only used to satisfy
     # TestFilesProcess' syntax.
-    test pt-pe-12.$n "pt::pe bottomup, $label" -setup {
+    test pt-expr-12.$n "pt::pe bottomup, $label" -setup {
 	proc DUMP {pe args} { global res ; lappend res $pe ; return $pe }
 	set res {}
     } -body {
@@ -214,64 +238,64 @@ TestFilesProcess $mytestdir ok pe_serial pe_serial-budump -> n label input data 
 
 #----------------------------------------------------------------------
 
-test pt-pe-13.0 {equal, yes} -body {
+test pt-expr-13.0 {equal, yes} -body {
     pt::pe equal {n X} {n X}
 } -result 1
 
-test pt-pe-13.1 {equal, nested, yes} -body {
+test pt-expr-13.1 {equal, nested, yes} -body {
     pt::pe equal {x {n X}} {x {n X}}
 } -result 1
 
-test pt-pe-13.2 {equal, no} -body {
+test pt-expr-13.2 {equal, no} -body {
     pt::pe equal {t a} {n X}
 } -result 0
 
-test pt-pe-13.3 {equal, nested, no} -body {
+test pt-expr-13.3 {equal, nested, no} -body {
     pt::pe equal {x {t a}} {x {n X}}
 } -result 0
 
-test pt-pe-13.4 {equal, nested, no} -body {
+test pt-expr-13.4 {equal, nested, no} -body {
     pt::pe equal {x {n X}} {x {n X} {t a}}
 } -result 0
 
 # -------------------------------------------------------------------------
 
-test pt-pe-14.0 {verify-as-canonical, wrong#args} -body {
+test pt-expr-14.0 {verify-as-canonical, wrong#args} -body {
     pt::pe verify-as-canonical
 } -returnCodes error -result {wrong # args: should be "pt::pe verify-as-canonical serial"}
 
-test pt-pe-14.1 {verify-as-canonical, wrong#args} -body {
+test pt-expr-14.1 {verify-as-canonical, wrong#args} -body {
     pt::pe verify-as-canonical PE XXX
 } -returnCodes error -result {wrong # args: should be "pt::pe verify-as-canonical serial"}
 
-test pt-pe-15.0 {canonicalize, wrong#args} -body {
+test pt-expr-15.0 {canonicalize, wrong#args} -body {
     pt::pe canonicalize
 } -returnCodes error -result {wrong # args: should be "pt::pe canonicalize serial"}
 
-test pt-pe-15.1 {canonicalize, wrong#args} -body {
+test pt-expr-15.1 {canonicalize, wrong#args} -body {
     pt::pe canonicalize PE XXX
 } -returnCodes error -result {wrong # args: should be "pt::pe canonicalize serial"}
 
 #----------------------------------------------------------------------
 
-test pt-pe-16.0 {verify-as-canonical, ok} -body {
+test pt-expr-16.0 {verify-as-canonical, ok} -body {
     pt::pe verify-as-canonical {x {n X} {t a}}
 } -result {}
 
-test pt-pe-16.1 {verify-as-canonical, ok} -body {
+test pt-expr-16.1 {verify-as-canonical, ok} -body {
     pt::pe verify-as-canonical {x {/ {n F} {.. a z}} {t a}}
 } -result {}
 
-test pt-pe-16.2 {verify-as-canonical, bad} -body {
+test pt-expr-16.2 {verify-as-canonical, bad} -body {
     pt::pe verify-as-canonical {x {n X } {t a}}
 } -returnCodes error -result {error in serialization: has irrelevant whitespace or (.. X X)}
 
-test pt-pe-16.3 {verify-as-canonical, bad} -body {
+test pt-expr-16.3 {verify-as-canonical, bad} -body {
     pt::pe verify-as-canonical {x {n 
 X } {t a}}
 } -returnCodes error -result {error in serialization: has irrelevant whitespace or (.. X X)}
 
-test pt-pe-16.4 {verify-as-canonical, bad} -body {
+test pt-expr-16.4 {verify-as-canonical, bad} -body {
     pt::pe verify-as-canonical {
 	x
 	{
@@ -283,30 +307,30 @@ test pt-pe-16.4 {verify-as-canonical, bad} -body {
     }
 } -returnCodes error -result {error in serialization: has irrelevant whitespace or (.. X X)}
 
-test pt-pe-16.5 {verify-as-canonical, bad} -body {
+test pt-expr-16.5 {verify-as-canonical, bad} -body {
     pt::pe verify-as-canonical {x {.. X X} {t a}}
 } -returnCodes error -result {error in serialization: has irrelevant whitespace or (.. X X)}
 
 #----------------------------------------------------------------------
 
-test pt-pe-17.0 {canonicalize} -body {
+test pt-expr-17.0 {canonicalize} -body {
     pt::pe canonicalize {x {n X} {t a}}
 } -result {x {n X} {t a}}
 
-test pt-pe-17.1 {canonicalize} -body {
+test pt-expr-17.1 {canonicalize} -body {
     pt::pe canonicalize {x {/ {n F} {.. a z}} {t a}}
 } -result {x {/ {n F} {.. a z}} {t a}}
 
-test pt-pe-17.2 {canonicalize} -body {
+test pt-expr-17.2 {canonicalize} -body {
     pt::pe canonicalize {x {n X } {t a}}
 } -result {x {n X} {t a}}
 
-test pt-pe-17.3 {canonicalize} -body {
+test pt-expr-17.3 {canonicalize} -body {
     pt::pe canonicalize {x {n 
 X } {t a}}
 } -result {x {n X} {t a}}
 
-test pt-pe-17.4 {canonicalize} -body {
+test pt-expr-17.4 {canonicalize} -body {
     pt::pe canonicalize {
 	x
 	{
@@ -318,38 +342,38 @@ test pt-pe-17.4 {canonicalize} -body {
     }
 } -result {x {/ {n F} {.. a z}} {t a}}
 
-test pt-pe-17.5 {canonicalize} -body {
+test pt-expr-17.5 {canonicalize} -body {
     pt::pe canonicalize {x {.. X X} {t a}}
 } -result {x {t X} {t a}}
 
 #----------------------------------------------------------------------
 
-test pt-pe-18.0 {equal} -body {
+test pt-expr-18.0 {equal} -body {
     pt::pe equal \
 	{x {n X} {t a}} \
 	{x {n X} {t a}}
 } -result 1
 
-test pt-pe-18.1 {equal} -body {
+test pt-expr-18.1 {equal} -body {
     pt::pe equal \
 	{x {/ {n F} {.. a z}} {t a}} \
 	{x {/ {n F} {.. a z}} {t a}}
 } -result 1
 
-test pt-pe-18.2 {equal} -body {
+test pt-expr-18.2 {equal} -body {
     pt::pe equal \
 	{x {n X } {t a}} \
 	{x {n X} {t a}}
 } -result 1
 
-test pt-pe-18.3 {equal} -body {
+test pt-expr-18.3 {equal} -body {
     pt::pe equal \
 	{x {n X} {t a}} \
 	{x {n 
 X } {t a}}
 } -result 1
 
-test pt-pe-18.4 {equal} -body {
+test pt-expr-18.4 {equal} -body {
     pt::pe equal \
 	{x {/ {n F} {.. a z}} {t a}} \
 	{
@@ -363,32 +387,32 @@ test pt-pe-18.4 {equal} -body {
     }
 } -result 1
 
-test pt-pe-18.5 {equal} -body {
+test pt-expr-18.5 {equal} -body {
     pt::pe equal \
 	{x {n X} {t a}} \
 	{x {n X} {t -}}
 } -result 0
 
-test pt-pe-18.6 {equal} -body {
+test pt-expr-18.6 {equal} -body {
     pt::pe equal \
 	{x {/ {n F} {.. a z}} {t a}} \
 	{x {/ {n F} {.. a d}} {t a}}
 } -result 0
 
-test pt-pe-18.7 {equal} -body {
+test pt-expr-18.7 {equal} -body {
     pt::pe equal \
 	{x {n X } {t a}} \
 	{x {n Z} {t a}}
 } -result 0
 
-test pt-pe-18.8 {equal} -body {
+test pt-expr-18.8 {equal} -body {
     pt::pe equal \
 	{x {n X} {t a}} \
 	{/ {n 
 X } {t a}}
 } -result 0
 
-test pt-pe-18.9 {equal} -body {
+test pt-expr-18.9 {equal} -body {
     pt::pe equal \
 	{x {/ {n F} {.. a z}} {t a}} \
 	{
